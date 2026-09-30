@@ -1,13 +1,16 @@
+```groovy
 pipeline {
 
     agent any
 
     environment {
         AWS_REGION = "ap-south-1"
-        AWS_ACCOUNT_ID = "660815084808"
+        AWS_ACCOUNT_ID = "240571106446"
 
         BACKEND_IMAGE = "sabarifullstack-backend"
         FRONTEND_IMAGE = "sabarifullstack-frontend"
+
+        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
     }
 
     stages {
@@ -15,8 +18,7 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 git branch: 'main',
-                    credentialsId: 'github-token',
-                    url: 'https://github.com/sabarivs110-cmd/sabarifullstack.git'
+    url: 'https://github.com/sabarivs110-cmd/sabarifullstack.git'
             }
         }
 
@@ -24,7 +26,35 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 sh '''
-                docker compose build
+                    echo "Building Docker images..."
+                    docker compose build
+                '''
+            }
+        }
+
+
+        stage('Trivy Security Scan') {
+            steps {
+                sh '''
+                    echo "Running Trivy vulnerability scan..."
+
+                    mkdir -p trivy-reports
+
+                    trivy --config /dev/null image \
+                        --scanners vuln \
+                        --severity HIGH,CRITICAL \
+                        --no-progress \
+                        ${BACKEND_IMAGE}:latest \
+                        | tee trivy-reports/backend-trivy.txt
+
+                    trivy --config /dev/null image \
+                        --scanners vuln \
+                        --severity HIGH,CRITICAL \
+                        --no-progress \
+                        ${FRONTEND_IMAGE}:latest \
+                        | tee trivy-reports/frontend-trivy.txt
+
+                    echo "Trivy scan completed."
                 '''
             }
         }
@@ -33,9 +63,11 @@ pipeline {
         stage('Login to ECR') {
             steps {
                 sh '''
-                aws ecr get-login-password --region $AWS_REGION | \
-                docker login --username AWS --password-stdin \
-                $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+                    echo "Logging in to Amazon ECR..."
+
+                    aws ecr get-login-password --region $AWS_REGION | \
+                    docker login --username AWS --password-stdin \
+                    $ECR_REGISTRY
                 '''
             }
         }
@@ -44,12 +76,13 @@ pipeline {
         stage('Tag Images') {
             steps {
                 sh '''
-                docker tag sabarifullstack-pipeline-backend:latest \
-                $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_IMAGE:v1
+                    echo "Tagging Docker images for ECR..."
 
+                    docker tag ${BACKEND_IMAGE}:latest \
+                    $ECR_REGISTRY/${BACKEND_IMAGE}:v1
 
-                docker tag frontend-app:latest \
-                $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_IMAGE:v1
+                    docker tag ${FRONTEND_IMAGE}:latest \
+                    $ECR_REGISTRY/${FRONTEND_IMAGE}:v1
                 '''
             }
         }
@@ -58,12 +91,13 @@ pipeline {
         stage('Push Images to ECR') {
             steps {
                 sh '''
-                docker push \
-                $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_IMAGE:v1
+                    echo "Pushing images to Amazon ECR..."
 
+                    docker push \
+                    $ECR_REGISTRY/${BACKEND_IMAGE}:v1
 
-                docker push \
-                $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_IMAGE:v1
+                    docker push \
+                    $ECR_REGISTRY/${FRONTEND_IMAGE}:v1
                 '''
             }
         }
@@ -72,10 +106,72 @@ pipeline {
         stage('Deploy Application') {
             steps {
                 sh '''
-                docker compose up -d
+                    echo "Deploying application using Docker Compose..."
+
+                    docker compose up -d
+
+                    echo "Current containers:"
+                    docker compose ps
+                '''
+            }
+        }
+
+
+        stage('Health Check') {
+            steps {
+                sh '''
+                    echo "Checking application health..."
+
+                    echo "Checking frontend..."
+                    curl -f http://localhost/
+
+                    echo "Checking backend..."
+                    curl -f http://localhost:3000/
+
+                    echo "Checking MySQL..."
+                    docker inspect --format='{{.State.Health.Status}}' mysql-container
+
+                    echo "Health checks completed successfully."
+                '''
+            }
+        }
+
+
+        stage('Cleanup Old Images') {
+            steps {
+                sh '''
+                    echo "Cleaning unused Docker images..."
+
+                    docker image prune -f
+
+                    echo "Docker cleanup completed."
                 '''
             }
         }
 
     }
+
+    post {
+
+        always {
+            echo "Archiving Trivy security reports..."
+
+            archiveArtifacts artifacts: 'trivy-reports/*.txt',
+                             allowEmptyArchive: true
+        }
+
+        success {
+            echo "======================================"
+            echo "CI/CD PIPELINE SUCCESSFUL"
+            echo "======================================"
+        }
+
+        failure {
+            echo "======================================"
+            echo "CI/CD PIPELINE FAILED"
+            echo "Check Jenkins Console Output"
+            echo "======================================"
+        }
+    }
 }
+```
