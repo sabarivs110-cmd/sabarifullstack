@@ -52,7 +52,10 @@ services:
 
 
   frontend:
-    image: frontend-app
+    build:
+      context: ./frontend
+    image: sabarifullstack-frontend:latest
+
     container_name: frontend-container
     restart: always
 
