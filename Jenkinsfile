@@ -17,27 +17,30 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 git branch: 'main',
-    url: 'https://github.com/sabarivs110-cmd/sabarifullstack.git'
+                    url: 'https://github.com/sabarivs110-cmd/sabarifullstack.git'
             }
         }
-
 
         stage('Build Docker Images') {
             steps {
                 sh '''
                     echo "Building Docker images..."
+
                     docker compose build
                 '''
             }
         }
 
-
         stage('Trivy Security Scan') {
             steps {
                 sh '''
+                    set -o pipefail
+
                     echo "Running Trivy vulnerability scan..."
 
                     mkdir -p trivy-reports
+
+                    echo "Scanning backend image..."
 
                     trivy --config /dev/null image \
                         --scanners vuln \
@@ -46,6 +49,8 @@ pipeline {
                         ${BACKEND_IMAGE}:latest \
                         | tee trivy-reports/backend-trivy.txt
 
+                    echo "Scanning frontend image..."
+
                     trivy --config /dev/null image \
                         --scanners vuln \
                         --severity HIGH,CRITICAL \
@@ -53,11 +58,10 @@ pipeline {
                         ${FRONTEND_IMAGE}:latest \
                         | tee trivy-reports/frontend-trivy.txt
 
-                    echo "Trivy scan completed."
+                    echo "Trivy scan completed successfully."
                 '''
             }
         }
-
 
         stage('Login to ECR') {
             steps {
@@ -71,21 +75,19 @@ pipeline {
             }
         }
 
-
         stage('Tag Images') {
             steps {
                 sh '''
                     echo "Tagging Docker images for ECR..."
 
                     docker tag ${BACKEND_IMAGE}:latest \
-                    $ECR_REGISTRY/${BACKEND_IMAGE}:v1
+                        $ECR_REGISTRY/${BACKEND_IMAGE}:v1
 
                     docker tag ${FRONTEND_IMAGE}:latest \
-                    $ECR_REGISTRY/${FRONTEND_IMAGE}:v1
+                        $ECR_REGISTRY/${FRONTEND_IMAGE}:v1
                 '''
             }
         }
-
 
         stage('Push Images to ECR') {
             steps {
@@ -93,32 +95,31 @@ pipeline {
                     echo "Pushing images to Amazon ECR..."
 
                     docker push \
-                    $ECR_REGISTRY/${BACKEND_IMAGE}:v1
+                        $ECR_REGISTRY/${BACKEND_IMAGE}:v1
 
                     docker push \
-                    $ECR_REGISTRY/${FRONTEND_IMAGE}:v1
+                        $ECR_REGISTRY/${FRONTEND_IMAGE}:v1
                 '''
             }
         }
 
-
         stage('Deploy Application') {
-    steps {
-        sh '''
-            echo "Stopping previous deployment..."
+            steps {
+                sh '''
+                    echo "Stopping previous deployment..."
 
-            docker compose down || true
+                    docker compose down || true
 
-            echo "Deploying application using Docker Compose..."
+                    echo "Deploying application using Docker Compose..."
 
-            docker compose up -d
+                    docker compose up -d
 
-            echo "Current containers:"
-            docker compose ps
-        '''
-    }
-}
+                    echo "Current containers:"
 
+                    docker compose ps
+                '''
+            }
+        }
 
         stage('Health Check') {
             steps {
@@ -126,19 +127,23 @@ pipeline {
                     echo "Checking application health..."
 
                     echo "Checking frontend..."
+
                     curl -f http://localhost/
 
                     echo "Checking backend..."
+
                     curl -f http://localhost:3000/
 
                     echo "Checking MySQL..."
-                    docker inspect --format='{{.State.Health.Status}}' mysql-container
+
+                    docker inspect \
+                        --format='{{.State.Health.Status}}' \
+                        mysql-container
 
                     echo "Health checks completed successfully."
                 '''
             }
         }
-
 
         stage('Cleanup Old Images') {
             steps {
@@ -177,3 +182,5 @@ pipeline {
         }
     }
 }
+```
+
