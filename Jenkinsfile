@@ -1,6 +1,5 @@
 pipeline {
 
-```
 agent any
 
 environment {
@@ -26,7 +25,6 @@ stages {
         steps {
             sh '''
                 echo "Building Docker images..."
-
                 docker compose build
             '''
         }
@@ -115,7 +113,7 @@ stages {
 
                 docker compose up -d
 
-                echo "Current containers:"
+                echo "Current containers..."
 
                 docker compose ps
             '''
@@ -128,11 +126,9 @@ stages {
                 echo "Checking application health..."
 
                 echo "Checking frontend..."
-
                 curl -f http://localhost/
 
                 echo "Checking backend..."
-
                 curl -f http://localhost:3000/
 
                 echo "Checking MySQL..."
@@ -157,7 +153,6 @@ stages {
             '''
         }
     }
-
 }
 
 post {
