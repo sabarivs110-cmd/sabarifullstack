@@ -8,7 +8,7 @@ function App() {
 
   useEffect(() => {
 
-    fetch("http://15.252.73.53:3000/employees")
+    fetch("/api/employees")
       .then((response) => {
         if (!response.ok) {
           throw new Error("Failed to fetch employees");
