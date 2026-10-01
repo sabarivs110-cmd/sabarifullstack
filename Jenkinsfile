@@ -35,6 +35,8 @@ stages {
             sh '''
                 set -o pipefail
 
+                export TMPDIR=/var/lib/trivy/tmp
+
                 echo "Running Trivy vulnerability scan..."
 
                 mkdir -p trivy-reports
