@@ -103,17 +103,21 @@ pipeline {
 
 
         stage('Deploy Application') {
-            steps {
-                sh '''
-                    echo "Deploying application using Docker Compose..."
+    steps {
+        sh '''
+            echo "Stopping previous deployment..."
 
-                    docker compose up -d
+            docker compose down || true
 
-                    echo "Current containers:"
-                    docker compose ps
-                '''
-            }
-        }
+            echo "Deploying application using Docker Compose..."
+
+            docker compose up -d
+
+            echo "Current containers:"
+            docker compose ps
+        '''
+    }
+}
 
 
         stage('Health Check') {
