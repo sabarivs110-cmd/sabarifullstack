@@ -14,23 +14,32 @@ environment {
 
 stages {
 
-    stage('Checkout Code') {
-        steps {
-            git branch: 'main',
-                url: 'https://github.com/sabarivs110-cmd/sabarifullstack.git'
-        }
-    }
-
     stage('Build Docker Images') {
-        steps {
-            sh '''
-                echo "Building Docker images..."
-                docker compose build
-            '''
-        }
+    steps {
+        sh '''
+            echo "Building Docker images..."
+            docker compose build
+        '''
     }
+}
 
-    stage('Trivy Security Scan') {
+stage('Run Application Tests') {
+    steps {
+        sh '''
+            echo "Running backend application tests..."
+
+            cd backend
+
+            npm install
+
+            npm test
+
+            echo "Application tests completed successfully."
+        '''
+    }
+}
+
+stage('Trivy Security Scan') {
         steps {
             sh '''
                 set -o pipefail
