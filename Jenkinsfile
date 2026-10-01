@@ -41,7 +41,7 @@ stages {
 
                 echo "Scanning backend image..."
 
-                trivy --config /dev/null image \
+                trivy --config /dev/null --cache-dir /var/lib/trivy image \
                     --scanners vuln \
                     --severity HIGH,CRITICAL \
                     --no-progress \
@@ -50,7 +50,7 @@ stages {
 
                 echo "Scanning frontend image..."
 
-                trivy --config /dev/null image \
+                trivy --config /dev/null --cache-dir /var/lib/trivy image \
                     --scanners vuln \
                     --severity HIGH,CRITICAL \
                     --no-progress \
